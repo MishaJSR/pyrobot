@@ -2,8 +2,7 @@ from asyncio import get_event_loop
 
 import grpc
 from pyrogram import Client
-import asyncio
-from grpc_utils import message_pb2_grpc, message_pb2
+from grpc_utils.proto import message_pb2_grpc, message_pb2
 
 
 class ProgressTracker:
@@ -13,25 +12,23 @@ class ProgressTracker:
         self.bot_name: str = bot_name
         self.static_key: str = static_key
         self.current_id = None
-        self.last_message_id = None
         self.channel = grpc.insecure_channel('localhost:50051')
         self.stub = message_pb2_grpc.MessageServiceStub(self.channel)
 
     def set_cur_id(self, new_id):
         self.current_id = new_id
 
-    def set_last_message_id(self, new_id):
-        self.last_message_id = new_id
-
     def progress_hook(self, d):
         if d['status'] == 'downloading':
             percent = d['downloaded_bytes'] / d['total_bytes'] * 100 if d['total_bytes'] else 0
 
-            if percent - self.last_percent >= 10:
+            if percent - self.last_percent >= 3:
 
                 percent = round(percent)
                 print(f"Загружено {percent}%")
-                self.stub.SendMessage(message_pb2.Message(text=f"{percent}", tg_user_id=str(self.current_id)))
+                self.stub.SendMessage(message_pb2.Message(text=f"{percent}",
+                                                          tg_user_id=str(self.current_id),
+                                                          type_mess="progress"))
                 self.last_percent = percent
 
         elif d['status'] == 'finished':

@@ -3,9 +3,9 @@
 import grpc
 import warnings
 
-from grpc_utils import message_pb2 as message__pb2
+from grpc_utils.proto import message_pb2 as message__pb2
 
-GRPC_GENERATED_VERSION = '1.67.1'
+GRPC_GENERATED_VERSION = '1.68.1'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 

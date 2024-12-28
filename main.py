@@ -1,7 +1,9 @@
 from pyrogram import Client, filters
 import yt_dlp
+from pyrogram.filters import video
 
 from base_settings import base_settings
+from grpc_utils.proto import message_pb2
 from utils import ProgressTracker
 
 API_ID = base_settings.get_id()
@@ -22,29 +24,39 @@ ydl_opts = {
     'quiet': True,
 }
 progress_tracker = ProgressTracker(client=app, bot_name=bot_name, static_key=static_status+static_reg)
+stub = progress_tracker.stub
 ydl_opts['progress_hooks'].append(progress_tracker.progress_hook)
 static_ydl = yt_dlp.YoutubeDL(ydl_opts)
 
 @app.on_message(filters.chat(bot_name))
 async def reply_with_video(client, message):
     url, chat = message.text.split("`")
-    sent_message = await client.send_message(chat_id=bot_name, text=f'Видео загружается{static_reg}{chat}')
+    stub.SendMessage(message_pb2.Message(text=f"{url}",
+                                         tg_user_id=chat,
+                                         type_mess="url"))
     progress_tracker.set_cur_id(chat)
-    progress_tracker.set_last_message_id(sent_message.id)
     try:
         with static_ydl as ydl:
+            time_dict = ydl.extract_info(url, download=False)
+            file_path = ydl.prepare_filename(time_dict)
+            video_duration = time_dict.get('duration', None)
             info_dict = ydl.extract_info(url, download=True)
-            file_path = ydl.prepare_filename(info_dict)
     except:
-        await client.send_message(chat_id=bot_name, text=f'Ошибка загрузки{static_reg}{chat}')
+        stub.SendMessage(message_pb2.Message(text=f"Ошибка загрузки",
+                                             tg_user_id=chat,
+                                             type_mess="error_load"))
         return
     try:
         with open(file_path, "rb") as _:
             pass
     except FileNotFoundError:
-        await client.send_message(chat_id=bot_name, text=f'Видео не найдено. Проверьте путь!{static_reg}{chat}')
+        stub.SendMessage(message_pb2.Message(text=f"Ошибка на стороне сервера",
+                                             tg_user_id=chat,
+                                             type_mess="error_server"))
         return
-    await client.send_message(chat_id=bot_name, text=f'Отправляю видео{static_reg}{chat}')
+    stub.SendMessage(message_pb2.Message(text=f"{video_duration}",
+                                         tg_user_id=chat,
+                                         type_mess="send_video"))
     await client.send_video(chat_id=bot_name, video=file_path, caption=f"Вот ваше видео!{static_reg}{chat}")
 
 
