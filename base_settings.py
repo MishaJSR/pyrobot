@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     API_HASH: str
     BOT_NAME: str
     PWD: str
+    STATIC_STATUS: str
+    STATIC_REG: str
 
     def get_id(self):
         return self.API_ID
@@ -18,6 +20,12 @@ class Settings(BaseSettings):
 
     def get_pwd(self):
         return self.PWD
+
+    def get_status(self):
+        return self.STATIC_STATUS
+
+    def get_reg(self):
+        return self.STATIC_REG
 
 
 

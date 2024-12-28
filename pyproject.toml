@@ -12,6 +12,8 @@ tgcrypto = "^1.2.5"
 yt-dlp = "^2024.12.23"
 secretstorage = "^3.3.3"
 pydantic-settings = "^2.7.0"
+grpcio = "^1.68.1"
+grpcio-tools = "^1.68.1"
 
 
 [build-system]
