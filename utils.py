@@ -34,3 +34,5 @@ class ProgressTracker:
         elif d['status'] == 'finished':
             print(f"Загрузка завершена: {d['filename']}")
             self.last_percent = 0
+
+

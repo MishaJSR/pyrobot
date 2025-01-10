@@ -1,28 +1,45 @@
 import asyncio
+from asyncio import Queue
 
+class AsyncQueue:
+    def __init__(self):
+        self.queue = Queue()
+        self.processing = False
 
-async def async_function(w):
-    # Время работы функции (w / 3 секунд)
-    duration = w / 3
+    async def add_to_queue(self, item):
+        await self.queue.put(item)
+        # if not self.processing:
+        #     self.processing = True
+        #     await self.process_queue()
 
-    # Количество значений, которые нужно вывести
-    num_values = 10
+    async def process_queue(self):
+        while self.queue:
+            item = await self.queue.get()
+            await self.work(item)
 
-    # Интервал между выводами значений
-    interval = duration / num_values
+        self.processing = False
 
-    # Асинхронный цикл для вывода значений
-    for i in range(num_values):
-        # Ждем между выводами значений
-        await asyncio.sleep(interval)
+    @staticmethod
+    async def work(item):
+        print("start working")
+        print(item)
+        print("end working")
+        await asyncio.sleep(5)
 
-        # Рассчитываем процент времени выполнения
-        progress = (i + 1) * (100 / num_values)
+# Usage
+async def main():
+    queue = AsyncQueue()
+    task = asyncio.create_task(queue.process_queue())
 
-        # Выводим процент времени
-        print(f"Progress {i + 1}: {progress:.2f}%")
+    await queue.add_to_queue("sds")
+    print("add 1")
+    await queue.add_to_queue("sdfsdf")
+    print("add 2")
+    await queue.add_to_queue("sdfsfdds")
+    print("add 3")
+    await queue.add_to_queue("sdfsdf")
+    print("add 4")
+    await task
 
-
-# Пример вызова функции
-w = 45  # Параметр, определяющий время работы функции
-asyncio.run(async_function(w))
+# Run the main function
+asyncio.run(main())

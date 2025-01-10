@@ -1,9 +1,13 @@
-from pyrogram import Client, filters
-import yt_dlp
-from pyrogram.filters import video
+import asyncio
+import threading
+import time
+from concurrent.futures.thread import ThreadPoolExecutor
 
+from pyrogram import Client, filters, idle
+import yt_dlp
+
+from AsyncQueue import AsyncQueue
 from base_settings import base_settings
-from grpc_utils.proto import message_pb2
 from utils import ProgressTracker
 
 API_ID = base_settings.get_id()
@@ -27,39 +31,25 @@ progress_tracker = ProgressTracker(client=app, bot_name=bot_name, static_key=sta
 stub = progress_tracker.stub
 ydl_opts['progress_hooks'].append(progress_tracker.progress_hook)
 static_ydl = yt_dlp.YoutubeDL(ydl_opts)
+queue = AsyncQueue(stub=stub, static_ydl=static_ydl, progress_tracker=progress_tracker)
+
+def dome():
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(my_async_function())
+
+async def my_async_function():
+    await queue.worker()
+
 
 @app.on_message(filters.chat(bot_name))
 async def reply_with_video(client, message):
-    url, chat = message.text.split("`")
-    stub.SendMessage(message_pb2.Message(text=f"{url}",
-                                         tg_user_id=chat,
-                                         type_mess="url"))
-    progress_tracker.set_cur_id(chat)
-    try:
-        with static_ydl as ydl:
-            time_dict = ydl.extract_info(url, download=False)
-            file_path = ydl.prepare_filename(time_dict)
-            video_duration = time_dict.get('duration', None)
-            info_dict = ydl.extract_info(url, download=True)
-    except:
-        stub.SendMessage(message_pb2.Message(text=f"Ошибка загрузки",
-                                             tg_user_id=chat,
-                                             type_mess="error_load"))
-        return
-    try:
-        with open(file_path, "rb") as _:
-            pass
-    except FileNotFoundError:
-        stub.SendMessage(message_pb2.Message(text=f"Ошибка на стороне сервера",
-                                             tg_user_id=chat,
-                                             type_mess="error_server"))
-        return
-    stub.SendMessage(message_pb2.Message(text=f"{video_duration}",
-                                         tg_user_id=chat,
-                                         type_mess="send_video"))
-    await client.send_video(chat_id=bot_name, video=file_path, caption=f"Вот ваше видео!{static_reg}{chat}")
+    print("get message")
+    if not queue.is_start:
+        thread = threading.Thread(target=dome)
+        thread.start()
+        queue.is_start = True
+    await queue.add_to_queue(client, message)
+
+app.run()
 
 
-if __name__ == "__main__":
-    print("Userbot запущен. Нажмите Ctrl+C для остановки.")
-    app.run()
