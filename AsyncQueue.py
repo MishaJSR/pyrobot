@@ -1,5 +1,8 @@
 import asyncio
+import os
 from asyncio import Queue
+
+import yt_dlp.utils
 
 from base_settings import base_settings
 from grpc_utils.proto import message_pb2
@@ -17,29 +20,13 @@ class AsyncQueue:
 
     async def add_to_queue(self, client=None, message=None):
         url, chat = message.text.split("`")
-        with self.static_ydl as ydl:
-            info = ydl.extract_info(url, download=False)
-            video_duration = info.get('duration', None)
-        if video_duration > 3599:
-            self.stub.SendMessage(message_pb2.Message(text=f"Видео больше часа в данный момент не загружаем\n",
-                                                              tg_user_id=chat,
-                                                              type_mess="repeat"))
-            return
-        for item in self.queue._queue:
-            if item[2] == chat:
-                self.stub.SendMessage(message_pb2.Message(text=f"Одно из Ваших видео уже находится в очереди\n"
-                                                               f"Пожалуйста дождитесь загрузки",
-                                                          tg_user_id=chat,
-                                                          type_mess="repeat"))
-                return
-        await self.queue.put((client, url, chat))
-        position = self.queue.qsize()
-        self.stub.SendMessage(message_pb2.Message(text=f"Позиция в очереди: {position}",
-                                                  tg_user_id=chat,
-                                                  type_mess="position"))
-
-        print(f"Item added to queue")
-        return position
+        if await self.check_video(chat=chat, url=url):
+            position = self.queue.qsize() + 1
+            self.stub.SendMessage(message_pb2.Message(text=f"Позиция в очереди: {position}",
+                                                      tg_user_id=chat,
+                                                      type_mess="position"))
+            await self.queue.put((client, url, chat))
+            print(f"Item added to queue")
 
     async def worker(self):
         print("worker start")
@@ -89,4 +76,29 @@ class AsyncQueue:
         self.stub.SendMessage(message_pb2.Message(text=f"{video_duration}",
                                                   tg_user_id=chat,
                                                   type_mess="video_delivered"))
+        os.remove(file_path)
         print(f"End working on {item}")
+
+    async def check_video(self, chat, url):
+        try:
+            with self.static_ydl as ydl:
+                info = ydl.extract_info(url, download=False)
+                video_duration = info.get('duration', None)
+        except yt_dlp.utils.DownloadError:
+            self.stub.SendMessage(message_pb2.Message(text=f"Качество видео слишком низкое для загрузки 720р\n",
+                                                              tg_user_id=chat,
+                                                              type_mess="repeat"))
+            return
+        if video_duration > 3599:
+            self.stub.SendMessage(message_pb2.Message(text=f"Видео больше часа в данный момент не загружаем\n",
+                                                              tg_user_id=chat,
+                                                              type_mess="repeat"))
+            return
+        # for item in self.queue._queue:
+        #     if item[2] == chat:
+        #         self.stub.SendMessage(message_pb2.Message(text=f"Одно из Ваших видео уже находится в очереди\n"
+        #                                                        f"Пожалуйста дождитесь загрузки",
+        #                                                   tg_user_id=chat,
+        #                                                   type_mess="repeat"))
+        #         return
+        return True

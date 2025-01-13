@@ -1,9 +1,7 @@
 import asyncio
 import threading
-import time
-from concurrent.futures.thread import ThreadPoolExecutor
 
-from pyrogram import Client, filters, idle
+from pyrogram import Client, filters
 import yt_dlp
 
 from AsyncQueue import AsyncQueue
@@ -21,7 +19,7 @@ app = Client("teletoon_userbot", api_id=API_ID, api_hash=API_HASH)
 
 ydl_opts = {
     'outtmpl': f'{pwd}/media/%(title)s.%(ext)s',
-    'cookiesfrombrowser': ("chrome",),
+    'cookiefile': 'cookies.txt',
     'format' : 'bestvideo[height=720][ext=mp4]+bestaudio',
     'merge_output_format' : 'mp4',
     'progress_hooks': [],
@@ -45,6 +43,8 @@ async def start_worker():
 async def reply_with_video(client, message):
     print("get message")
     await queue.add_to_queue(client, message)
+
+
 
 
 thread = threading.Thread(target=dome)
