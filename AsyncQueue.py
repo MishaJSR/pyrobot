@@ -18,11 +18,6 @@ class AsyncQueue:
 
     async def add_to_queue(self, client=None, message=None):
         url, chat = message.text.split("`")
-        if not validators.url(url):
-            self.stub.SendMessage(message_pb2.Message(text=f"URL не определен",
-                                                      tg_user_id=chat,
-                                                      type_mess="error_load"))
-            return
         with self.static_ydl as ydl:
             info = ydl.extract_info(url, download=False)
             video_duration = info.get('duration', None)
