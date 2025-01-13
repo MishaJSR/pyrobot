@@ -23,11 +23,27 @@ class AsyncQueue:
                                                       tg_user_id=chat,
                                                       type_mess="error_load"))
             return
+        with self.static_ydl as ydl:
+            info = ydl.extract_info(url, download=False)
+            video_duration = info.get('duration', None)
+        if video_duration > 3599:
+            self.stub.SendMessage(message_pb2.Message(text=f"Видео больше часа в данный момент не загружаем\n",
+                                                              tg_user_id=chat,
+                                                              type_mess="repeat"))
+            return
+        for item in self.queue._queue:
+            if item[2] == chat:
+                self.stub.SendMessage(message_pb2.Message(text=f"Одно из Ваших видео уже находится в очереди\n"
+                                                               f"Пожалуйста дождитесь загрузки",
+                                                          tg_user_id=chat,
+                                                          type_mess="repeat"))
+                return
         await self.queue.put((client, url, chat))
         position = self.queue.qsize()
         self.stub.SendMessage(message_pb2.Message(text=f"Позиция в очереди: {position}",
                                                   tg_user_id=chat,
                                                   type_mess="position"))
+
         print(f"Item added to queue")
         return position
 
@@ -35,9 +51,11 @@ class AsyncQueue:
         print("worker start")
         while True:
             if not self.queue.empty():
-                item = await self.queue.get()
+                item = self.queue._queue[0]
                 print("start work with")
+                print(self.queue.qsize())
                 await self.work(item)
+                await self.queue.get()
                 self.queue.task_done()
             await asyncio.sleep(1)
 
@@ -49,12 +67,12 @@ class AsyncQueue:
             with self.static_ydl as ydl:
                 info = ydl.extract_info(url, download=False)
                 file_path = ydl.prepare_filename(info)
+                video_duration = info.get('duration', None)
                 img_url = info.get('thumbnail')
                 description = info.get('title')
                 self.stub.SendMessage(message_pb2.Message(text=f"{url}`{img_url}`{description}",
                                                           tg_user_id=chat,
                                                           type_mess="url"))
-                video_duration = info.get('duration', None)
                 ydl.download(url)
         except:
             self.stub.SendMessage(message_pb2.Message(text=f"Ошибка загрузки",
