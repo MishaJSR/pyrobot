@@ -1,6 +1,5 @@
 import asyncio
 from asyncio import Queue
-import validators
 
 from base_settings import base_settings
 from grpc_utils.proto import message_pb2
