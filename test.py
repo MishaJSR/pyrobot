@@ -1,45 +1,38 @@
 import asyncio
-from asyncio import Queue
 
 class AsyncQueue:
     def __init__(self):
-        self.queue = Queue()
-        self.processing = False
+        self.queue = asyncio.Queue()
+        self.lock = asyncio.Lock()
 
-    async def add_to_queue(self, item):
-        await self.queue.put(item)
-        # if not self.processing:
-        #     self.processing = True
-        #     await self.process_queue()
+    async def add(self, item):
+        async with self.lock:  # Гарантия последовательного добавления
+            await self.queue.put(item)
+            position = self.queue.qsize()  # Определяем позицию элемента
+        print(f"Элемент {item} добавлен в очередь. Его позиция: {position}")
+        return position
 
-    async def process_queue(self):
-        while self.queue:
+    async def process(self):
+        while True:
             item = await self.queue.get()
-            await self.work(item)
+            print(f"Обрабатываю элемент: {item}")
+            await asyncio.sleep(1)  # Симуляция обработки
+            self.queue.task_done()
 
-        self.processing = False
-
-    @staticmethod
-    async def work(item):
-        print("start working")
-        print(item)
-        print("end working")
-        await asyncio.sleep(5)
-
-# Usage
 async def main():
-    queue = AsyncQueue()
-    task = asyncio.create_task(queue.process_queue())
+    async_queue = AsyncQueue()
 
-    await queue.add_to_queue("sds")
-    print("add 1")
-    await queue.add_to_queue("sdfsdf")
-    print("add 2")
-    await queue.add_to_queue("sdfsfdds")
-    print("add 3")
-    await queue.add_to_queue("sdfsdf")
-    print("add 4")
-    await task
+    # Добавление элементов в очередь
+    await async_queue.add("A")
+    asyncio.create_task(async_queue.process())
+    await async_queue.add("B")
+    await async_queue.add("C")
 
-# Run the main function
+    # Обработка очереди
+    #asyncio.create_task(async_queue.process())
+
+    # Ждем завершения обработки всех элементов
+    await async_queue.queue.join()
+
+# Запускаем asyncio-программу
 asyncio.run(main())

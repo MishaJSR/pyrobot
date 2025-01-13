@@ -35,21 +35,20 @@ queue = AsyncQueue(stub=stub, static_ydl=static_ydl, progress_tracker=progress_t
 
 def dome():
     loop = asyncio.new_event_loop()
-    loop.run_until_complete(my_async_function())
+    loop.run_until_complete(start_worker())
 
-async def my_async_function():
+async def start_worker():
     await queue.worker()
 
 
 @app.on_message(filters.chat(bot_name))
 async def reply_with_video(client, message):
     print("get message")
-    if not queue.is_start:
-        thread = threading.Thread(target=dome)
-        thread.start()
-        queue.is_start = True
     await queue.add_to_queue(client, message)
 
+
+thread = threading.Thread(target=dome)
+thread.start()
 app.run()
 
 

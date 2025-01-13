@@ -1,6 +1,6 @@
 import asyncio
 from asyncio import Queue
-from concurrent.futures import ThreadPoolExecutor
+import validators
 
 from base_settings import base_settings
 from grpc_utils.proto import message_pb2
@@ -15,34 +15,46 @@ class AsyncQueue:
         self.static_status = base_settings.get_status()
         self.static_reg = base_settings.get_reg()
         self.bot_name = base_settings.get_bot_name()
-        self.is_start = False
 
     async def add_to_queue(self, client=None, message=None):
-        await self.queue.put((client, message))
-        print(f"Item {(client, message)} added to queue")
+        url, chat = message.text.split("`")
+        if not validators.url(url):
+            self.stub.SendMessage(message_pb2.Message(text=f"URL не определен",
+                                                      tg_user_id=chat,
+                                                      type_mess="error_load"))
+            return
+        await self.queue.put((client, url, chat))
+        position = self.queue.qsize()
+        self.stub.SendMessage(message_pb2.Message(text=f"Позиция в очереди: {position}",
+                                                  tg_user_id=chat,
+                                                  type_mess="position"))
+        print(f"Item added to queue")
+        return position
 
     async def worker(self):
         print("worker start")
         while True:
-            item = await self.queue.get()
-            if item is None:  # Если получен сигнал для остановки, выходим из цикла
-                break
-            await self.work(item)
-            self.queue.task_done()
-        print("worker stop")
+            if not self.queue.empty():
+                item = await self.queue.get()
+                print("start work with")
+                await self.work(item)
+                self.queue.task_done()
+            await asyncio.sleep(1)
 
     async def work(self, item):
-        client, message = item
-        url, chat = message.text.split("`")
-        self.stub.SendMessage(message_pb2.Message(text=f"{url}",
-                                                  tg_user_id=chat,
-                                                  type_mess="url"))
+        print(f"Start working on {item}")
+        client, url, chat = item
         self.progress_tracker.set_cur_id(chat)
         try:
             with self.static_ydl as ydl:
-                time_dict = ydl.extract_info(url, download=False)
-                file_path = ydl.prepare_filename(time_dict)
-                video_duration = time_dict.get('duration', None)
+                info = ydl.extract_info(url, download=False)
+                file_path = ydl.prepare_filename(info)
+                img_url = info.get('thumbnail')
+                description = info.get('title')
+                self.stub.SendMessage(message_pb2.Message(text=f"{url}`{img_url}`{description}",
+                                                          tg_user_id=chat,
+                                                          type_mess="url"))
+                video_duration = info.get('duration', None)
                 ydl.download(url)
         except:
             self.stub.SendMessage(message_pb2.Message(text=f"Ошибка загрузки",
@@ -65,6 +77,4 @@ class AsyncQueue:
         self.stub.SendMessage(message_pb2.Message(text=f"{video_duration}",
                                                   tg_user_id=chat,
                                                   type_mess="video_delivered"))
-        print(f"Start working on {item}")
-        await asyncio.sleep(5)
         print(f"End working on {item}")
